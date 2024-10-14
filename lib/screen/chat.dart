@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
@@ -60,22 +59,27 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _sendChatMessage(String message) async {
+    String formattedTime = DateFormat('kk:mm').format(DateTime.now());
     setState(() {
-      _messages.add(ChatMessage(text: message, isUser: true));
+      _messages
+          .add(ChatMessage(text: message, isUser: true, time: formattedTime));
     });
     try {
-      _messages.add(ChatMessage(text: '...', isUser: false));
+      _messages
+          .add(ChatMessage(text: '...', isUser: false, time: formattedTime));
       final response = await _chat.sendMessage(Content.text(message));
       final text = response.text ?? 'No se recibió respuesta';
       setState(() {
         _messages.removeLast();
-        _messages.add(ChatMessage(text: text, isUser: false));
+        _messages
+            .add(ChatMessage(text: text, isUser: false, time: formattedTime));
       });
       _scrollDown();
       await _speak(text);
     } catch (e) {
       setState(() {
-        _messages.add(ChatMessage(text: 'Error: $e', isUser: false));
+        _messages.add(
+            ChatMessage(text: 'Error: $e', isUser: false, time: formattedTime));
       });
     } finally {
       _textController.clear();
@@ -113,53 +117,13 @@ class _ChatScreenState extends State<ChatScreen> {
     _speech.stop();
   }
 
-  void _showMessageOptions(int index) {
-    showModalBottomSheet(
-      context: context,
-      builder: (BuildContext context) {
-        return Wrap(
-          children: [
-            ListTile(
-              leading: const Icon(Icons.copy),
-              title: const Text('Copiar'),
-              onTap: () {
-                // Copiar el mensaje al portapapeles
-                Clipboard.setData(ClipboardData(text: _messages[index].text));
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Mensaje copiado')),
-                );
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.delete),
-              title: const Text('Eliminar'),
-              onTap: () {
-                // Eliminar el mensaje
-                setState(() {
-                  _messages.removeAt(index);
-                });
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Mensaje eliminado')),
-                );
-              },
-            ),
-          ],
-        );
-      },
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-    String formattedDate =
-        DateFormat('yyyy-MM-dd – kk:mm').format(DateTime.now());
-
     return Scaffold(
       backgroundColor: const Color.fromARGB(197, 255, 174, 0),
       appBar: AppBar(
-        title: Text('Mi chat inteligente - $formattedDate'),
+        title: const Text('Mi chat inteligente'),
+        centerTitle: true, // Centra el título en el AppBar
       ),
       body: Column(
         children: [
@@ -168,11 +132,7 @@ class _ChatScreenState extends State<ChatScreen> {
               controller: _scrollController,
               itemCount: _messages.length,
               itemBuilder: (context, index) {
-                return GestureDetector(
-                  onLongPress: () => _showMessageOptions(
-                      index), // Mostrar opciones al presionar por mucho tiempo
-                  child: ChatBubble(message: _messages[index]),
-                );
+                return ChatBubble(message: _messages[index]);
               },
             ),
           ),
@@ -235,7 +195,8 @@ class _ChatScreenState extends State<ChatScreen> {
 class ChatMessage {
   final String text;
   final bool isUser;
-  ChatMessage({required this.text, required this.isUser});
+  final String time; // Campo de tiempo agregado
+  ChatMessage({required this.text, required this.isUser, required this.time});
 }
 
 class ChatBubble extends StatelessWidget {
@@ -248,50 +209,68 @@ class ChatBubble extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
       alignment: message.isUser ? Alignment.centerRight : Alignment.centerLeft,
-      child: Row(
-        mainAxisAlignment:
-            message.isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+      child: Column(
+        crossAxisAlignment:
+            message.isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
         children: [
-          if (!message.isUser)
-            const CircleAvatar(
-              backgroundImage: AssetImage('assets/logo.jpeg'),
-              radius: 20,
-            ),
-          const SizedBox(width: 8),
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 500),
-            curve: Curves.easeInOut,
-            constraints: BoxConstraints(
-              maxWidth: MediaQuery.of(context).size.width / 1.25,
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(
-              color: message.isUser
-                  ? const Color.fromARGB(255, 47, 89, 82)
-                  : const Color.fromARGB(255, 46, 65, 84),
-              borderRadius: BorderRadius.only(
-                topLeft: const Radius.circular(12),
-                topRight: const Radius.circular(12),
-                bottomLeft:
-                    message.isUser ? const Radius.circular(12) : Radius.zero,
-                bottomRight:
-                    message.isUser ? Radius.zero : const Radius.circular(12),
+          Row(
+            mainAxisAlignment: message.isUser
+                ? MainAxisAlignment.end
+                : MainAxisAlignment.start,
+            children: [
+              if (!message.isUser)
+                const CircleAvatar(
+                  backgroundImage: AssetImage('assets/logo.jpeg'),
+                  radius: 20,
+                ),
+              const SizedBox(width: 8),
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 500),
+                curve: Curves.easeInOut,
+                constraints: BoxConstraints(
+                  maxWidth: MediaQuery.of(context).size.width / 1.25,
+                ),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: message.isUser
+                      ? const Color.fromARGB(255, 47, 89, 82)
+                      : const Color.fromARGB(255, 46, 65, 84),
+                  borderRadius: BorderRadius.only(
+                    topLeft: const Radius.circular(12),
+                    topRight: const Radius.circular(12),
+                    bottomLeft: message.isUser
+                        ? const Radius.circular(12)
+                        : Radius.zero,
+                    bottomRight: message.isUser
+                        ? Radius.zero
+                        : const Radius.circular(12),
+                  ),
+                ),
+                child: Text(
+                  message.text,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    color: Colors.white,
+                  ),
+                ),
               ),
-            ),
-            child: Text(
-              message.text,
-              style: const TextStyle(
-                fontSize: 16,
-                color: Colors.white,
-              ),
+              if (message.isUser) const SizedBox(width: 8),
+              if (message.isUser)
+                const CircleAvatar(
+                  backgroundImage: AssetImage('assets/usuario.jpg'),
+                  radius: 25,
+                ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            message.time, // Muestra la hora debajo de cada mensaje
+            style: const TextStyle(
+              fontSize: 12,
+              color: Colors.white70,
             ),
           ),
-          if (message.isUser) const SizedBox(width: 8),
-          if (message.isUser)
-            const CircleAvatar(
-              backgroundImage: AssetImage('assets/usuario.jpg'),
-              radius: 25,
-            ),
         ],
       ),
     );

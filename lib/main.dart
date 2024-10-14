@@ -103,12 +103,6 @@ class _MainScreenState extends State<MainScreen> {
         backgroundColor: Colors.white,
         elevation: 0,
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _launchUrl, // Llama a la función _launchUrl
-        tooltip: 'Flutter',
-        backgroundColor: Colors.black,
-        child: const Icon(Icons.circle_outlined, color: Colors.white),
-      ),
     );
   }
 }
