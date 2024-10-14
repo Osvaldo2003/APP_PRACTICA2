@@ -1,6 +1,6 @@
 import 'package:osva/screen/chat.dart';
 import 'package:flutter/material.dart';
-import 'package:osva/screen/contacts.dart';
+import 'package:osva/screen/home.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 final Uri _url = Uri.parse('https://github.com/Osvaldo2003/APP_PRACTICA2.git');
@@ -92,7 +92,7 @@ class _MainScreenState extends State<MainScreen> {
       bottomNavigationBar: BottomNavigationBar(
         items: const <BottomNavigationBarItem>[
           BottomNavigationBarItem(
-              icon: Icon(Icons.contacts_outlined), label: 'Contactos'),
+              icon: Icon(Icons.contacts_outlined), label: 'Home'),
           BottomNavigationBarItem(
               icon: Icon(Icons.messenger), label: 'ChatBot'),
         ],
