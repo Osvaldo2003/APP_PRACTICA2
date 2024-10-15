@@ -4,6 +4,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:intl/intl.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 
 const String apiKey = "AIzaSyA-DsUGNFOHWfNV5DmgFUkva2JaPyLLHHg";
 
@@ -24,6 +25,7 @@ class _ChatScreenState extends State<ChatScreen> {
   late FlutterTts _flutterTts;
   bool _isListening = false;
   String _speechText = '';
+  bool _isConnectedToWifi = true; // Nuevo estado para la conectividad
 
   @override
   void initState() {
@@ -33,6 +35,8 @@ class _ChatScreenState extends State<ChatScreen> {
     _speech = stt.SpeechToText();
     _flutterTts = FlutterTts();
     requestMicrophonePermission();
+    _checkConnectivity(); // Comprobar la conectividad inicial
+    Connectivity().onConnectivityChanged.listen(_updateConnectionStatus);
   }
 
   Future<void> requestMicrophonePermission() async {
@@ -40,6 +44,17 @@ class _ChatScreenState extends State<ChatScreen> {
     if (!status.isGranted) {
       await Permission.microphone.request();
     }
+  }
+
+  Future<void> _checkConnectivity() async {
+    var connectivityResult = await Connectivity().checkConnectivity();
+    _updateConnectionStatus(connectivityResult);
+  }
+
+  void _updateConnectionStatus(ConnectivityResult result) {
+    setState(() {
+      _isConnectedToWifi = result == ConnectivityResult.wifi;
+    });
   }
 
   void _scrollDown() {
@@ -123,7 +138,7 @@ class _ChatScreenState extends State<ChatScreen> {
       backgroundColor: const Color.fromARGB(197, 255, 174, 0),
       appBar: AppBar(
         title: const Text('Mi chat inteligente'),
-        centerTitle: true, // Centra el título en el AppBar
+        centerTitle: true,
       ),
       body: Column(
         children: [
@@ -150,7 +165,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
                 Expanded(
                   child: TextField(
-                    onSubmitted: _sendChatMessage,
+                    onSubmitted: _isConnectedToWifi ? _sendChatMessage : null,
                     controller: _textController,
                     decoration: InputDecoration(
                       hintText: 'Envia un mensaje...',
@@ -181,7 +196,9 @@ class _ChatScreenState extends State<ChatScreen> {
                   icon: const Icon(Icons.send),
                   color: const Color.fromARGB(255, 21, 245, 107),
                   iconSize: 35,
-                  onPressed: () => _sendChatMessage(_textController.text),
+                  onPressed: _isConnectedToWifi
+                      ? () => _sendChatMessage(_textController.text)
+                      : null,
                 ),
               ],
             ),
@@ -195,7 +212,7 @@ class _ChatScreenState extends State<ChatScreen> {
 class ChatMessage {
   final String text;
   final bool isUser;
-  final String time; // Campo de tiempo agregado
+  final String time;
   ChatMessage({required this.text, required this.isUser, required this.time});
 }
 
@@ -265,10 +282,10 @@ class ChatBubble extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            message.time, // Muestra la hora debajo de cada mensaje
+            message.time,
             style: const TextStyle(
               fontSize: 12,
-              color: Colors.white70,
+              color: Colors.white60,
             ),
           ),
         ],
