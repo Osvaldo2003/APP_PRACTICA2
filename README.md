@@ -1,3 +1,3 @@
-# GvApp
+# osva
 
 aplicacion practica movil
