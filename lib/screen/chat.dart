@@ -5,6 +5,7 @@ import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:intl/intl.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 const String apiKey = "AIzaSyA-DsUGNFOHWfNV5DmgFUkva2JaPyLLHHg";
 
@@ -25,7 +26,7 @@ class _ChatScreenState extends State<ChatScreen> {
   late FlutterTts _flutterTts;
   bool _isListening = false;
   String _speechText = '';
-  bool _isConnectedToWifi = true; // Nuevo estado para la conectividad
+  bool _isConnectedToWifi = true;
 
   @override
   void initState() {
@@ -35,8 +36,35 @@ class _ChatScreenState extends State<ChatScreen> {
     _speech = stt.SpeechToText();
     _flutterTts = FlutterTts();
     requestMicrophonePermission();
-    _checkConnectivity(); // Comprobar la conectividad inicial
+    _checkConnectivity();
     Connectivity().onConnectivityChanged.listen(_updateConnectionStatus);
+    _loadChatHistory();
+  }
+
+  Future<void> _loadChatHistory() async {
+    final prefs = await SharedPreferences.getInstance();
+    final history = prefs.getStringList('chat_history') ?? [];
+    setState(() {
+      _messages.addAll(
+        history.map((msg) {
+          final parts = msg.split('::');
+          return ChatMessage(
+            text: parts[0],
+            isUser: parts[1] == 'user',
+            time: parts[2],
+          );
+        }).toList(),
+      );
+    });
+  }
+
+  Future<void> _saveChatHistory() async {
+    final prefs = await SharedPreferences.getInstance();
+    final history = _messages
+        .map(
+            (msg) => '${msg.text}::${msg.isUser ? 'user' : 'bot'}::${msg.time}')
+        .toList();
+    await prefs.setStringList('chat_history', history);
   }
 
   Future<void> requestMicrophonePermission() async {
@@ -68,7 +96,7 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _speak(String text) async {
-    await _flutterTts.setLanguage("en-EN");
+    await _flutterTts.setLanguage("en-US");
     await _flutterTts.setPitch(1.0);
     await _flutterTts.speak(text);
   }
@@ -82,7 +110,7 @@ class _ChatScreenState extends State<ChatScreen> {
     try {
       _messages
           .add(ChatMessage(text: '...', isUser: false, time: formattedTime));
-      final response = await _chat.sendMessage(Content.text(message));
+      final response = await _chat.sendMessage(Content.text("help"));
       final text = response.text ?? 'No se recibió respuesta';
       setState(() {
         _messages.removeLast();
@@ -91,6 +119,7 @@ class _ChatScreenState extends State<ChatScreen> {
       });
       _scrollDown();
       await _speak(text);
+      _saveChatHistory();
     } catch (e) {
       setState(() {
         _messages.add(
@@ -132,13 +161,65 @@ class _ChatScreenState extends State<ChatScreen> {
     _speech.stop();
   }
 
+  void _showConversationHistory() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Historial de Conversación'),
+          content: SizedBox(
+            height: 300,
+            child: ListView.builder(
+              itemCount: _messages.length,
+              itemBuilder: (context, index) {
+                final message = _messages[index];
+                return ListTile(
+                  title: Text(
+                    message.text,
+                    style: TextStyle(
+                        color: message.isUser ? Colors.blue : Colors.black),
+                  ),
+                  subtitle:
+                      Text(message.time, style: const TextStyle(fontSize: 12)),
+                );
+              },
+            ),
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cerrar'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _clearConversation() {
+    setState(() {
+      _messages.clear();
+    });
+    _saveChatHistory();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color.fromARGB(197, 255, 174, 0),
+      backgroundColor: const Color(0xFFE0F7FA),
       appBar: AppBar(
         title: const Text('Mi chat inteligente'),
         centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.history),
+            onPressed: _showConversationHistory,
+          ),
+          IconButton(
+            icon: const Icon(Icons.clear),
+            onPressed: _clearConversation,
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -158,7 +239,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 IconButton(
                   icon: Icon(
                     _isListening ? Icons.mic_off : Icons.mic,
-                    color: const Color.fromARGB(255, 255, 255, 255),
+                    color: Colors.white,
                     size: 32,
                   ),
                   onPressed: _isListening ? _stopListening : _startListening,
@@ -168,34 +249,20 @@ class _ChatScreenState extends State<ChatScreen> {
                     onSubmitted: _isConnectedToWifi ? _sendChatMessage : null,
                     controller: _textController,
                     decoration: InputDecoration(
-                      hintText: 'Envia un mensaje...',
+                      hintText: 'Envía un mensaje...',
                       hintStyle: const TextStyle(color: Colors.white),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                         borderSide: const BorderSide(
-                          color: Color.fromARGB(255, 5, 111, 138),
-                        ),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(
-                          color: Color.fromARGB(255, 0, 0, 0),
-                        ),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(
-                          color: Color.fromARGB(255, 46, 211, 54),
+                          color: Color.fromARGB(255, 5, 131, 243),
+                          width: 2,
                         ),
                       ),
                     ),
-                    style: const TextStyle(color: Colors.white),
                   ),
                 ),
                 IconButton(
                   icon: const Icon(Icons.send),
-                  color: const Color.fromARGB(255, 21, 245, 107),
-                  iconSize: 35,
                   onPressed: _isConnectedToWifi
                       ? () => _sendChatMessage(_textController.text)
                       : null,
@@ -213,81 +280,65 @@ class ChatMessage {
   final String text;
   final bool isUser;
   final String time;
+
   ChatMessage({required this.text, required this.isUser, required this.time});
 }
 
 class ChatBubble extends StatelessWidget {
   final ChatMessage message;
 
-  const ChatBubble({super.key, required this.message});
+  ChatBubble({super.key, required this.message});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
-      alignment: message.isUser ? Alignment.centerRight : Alignment.centerLeft,
-      child: Column(
-        crossAxisAlignment:
-            message.isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 8.0),
+      child: Row(
+        mainAxisAlignment:
+            message.isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: message.isUser
-                ? MainAxisAlignment.end
-                : MainAxisAlignment.start,
-            children: [
-              if (!message.isUser)
-                const CircleAvatar(
-                  backgroundImage: AssetImage('assets/logo.jpeg'),
-                  radius: 20,
-                ),
-              const SizedBox(width: 8),
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 500),
-                curve: Curves.easeInOut,
-                constraints: BoxConstraints(
-                  maxWidth: MediaQuery.of(context).size.width / 1.25,
-                ),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                decoration: BoxDecoration(
+          if (!message.isUser)
+            const CircleAvatar(
+              backgroundImage: AssetImage('assets/UP.jpg'),
+            ),
+          Padding(
+            padding: message.isUser
+                ? const EdgeInsets.only(left: 8.0)
+                : const EdgeInsets.only(right: 8.0),
+            child: Column(
+              crossAxisAlignment:
+                  message.isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+              children: [
+                Material(
                   color: message.isUser
-                      ? const Color.fromARGB(255, 47, 89, 82)
-                      : const Color.fromARGB(255, 46, 65, 84),
-                  borderRadius: BorderRadius.only(
-                    topLeft: const Radius.circular(12),
-                    topRight: const Radius.circular(12),
-                    bottomLeft: message.isUser
-                        ? const Radius.circular(12)
-                        : Radius.zero,
-                    bottomRight: message.isUser
-                        ? Radius.zero
-                        : const Radius.circular(12),
+                      ? const Color.fromARGB(255, 35, 150, 246)
+                      : const Color(0xFFf0f0f0),
+                  borderRadius: BorderRadius.circular(12),
+                  elevation: 2,
+                  child: Padding(
+                    padding: const EdgeInsets.all(12.0),
+                    child: Text(
+                      message.text,
+                      style: TextStyle(
+                        color: message.isUser ? Colors.white : Colors.black,
+                      ),
+                    ),
                   ),
                 ),
-                child: Text(
-                  message.text,
+                Text(
+                  message.time,
                   style: const TextStyle(
-                    fontSize: 16,
-                    color: Colors.white,
+                    fontSize: 12,
+                    color: Colors.grey,
                   ),
                 ),
-              ),
-              if (message.isUser) const SizedBox(width: 8),
-              if (message.isUser)
-                const CircleAvatar(
-                  backgroundImage: AssetImage('assets/usuario.jpg'),
-                  radius: 25,
-                ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Text(
-            message.time,
-            style: const TextStyle(
-              fontSize: 12,
-              color: Colors.white60,
+              ],
             ),
           ),
+          if (message.isUser)
+            const CircleAvatar(
+              backgroundImage: AssetImage('assets/UP.jpg'),
+            ),
         ],
       ),
     );
